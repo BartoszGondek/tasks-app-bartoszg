@@ -23,9 +23,14 @@ jobs:
             python-version: "3.12" 
 
         - name: Install dependecies
-          working-directory: services/tasks-api 
-          run: | 
-            python -m pip install -r requirements.txt
+           
+          working-directory: services/tasks-api
+          run: python -m pip install -r requirements.txt
 
-        - name: Run tests 
-          run: pytest 
+        - name: Run tasks-api tests
+          working-directory: services/tasks-api
+          run: python -m pytest
+
+        - name: Run title-normalizer tests
+          working-directory: services/title-normalizer
+          run: python -m pytest
