@@ -26,8 +26,8 @@ jobs:
             python-version: "3.12" 
 
         - name: Install dependecies
-           
           run: pip install -r services/${{ matrix.service }}/requirements.txt
+        - name: Run tests 
           run: pytest services/${{ matrix.service }}
 
         
