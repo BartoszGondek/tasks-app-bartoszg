@@ -1,42 +1,55 @@
-name: python workflow
+name: Test and Scan
 
-on: 
+on:
   push:
-    branches: [main]
-  pull_request: 
-    branches: [main]
+    branches:
+      - main
 
-permissions:
-  contents: read 
-
-jobs: 
-  test:
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          service: [tasks-api, title-normalizer]
-
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v6
-
-        - name: Set up Python
-          uses: actions/setup-python@v5
-          with: 
-            python-version: "3.12" 
-
-        - name: Install dependecies
-          run: pip install -r services/${{ matrix.service }}/requirements.txt
-        - name: Run tests 
-          run: pytest services/${{ matrix.service }}
-        - shell: bash 
-          run: pytest -rA services/${{ matrix.service }} | tee ${{matrix.service}}-test-report.txt
-        - uses: actions/upload-artifact@v7
+jobs:
+  run_tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [tasks-api, title-normalizer] # ${{matrix.service}}
+        python-version: ["3.10", "3.11", "3.12"] # ${{matrix.python-version}}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{matrix.python-version}}
+      - run: pip install -r services/${{matrix.service}}/requirements.txt
+      - run: pytest -rA services/${{matrix.service}} > ${{matrix.service}}-${{matrix.python-version}}-test-report.txt
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: ${{ matrix.service }}-test-report
-          path: ${{ matrix.service }}-test-report.txt
-
-        
-
-        
+          name: ${{matrix.service}}-${{matrix.python-version}} test report
+          path: ${{matrix.service}}-${{matrix.python-version}}-test-report.txt
+      - run: pip install bandit
+      - run: bandit -r services/${{matrix.service}} -f html -o ${{matrix.service}}-${{matrix.python-version}}-bandit-report.html
+        continue-on-error: true
+      - name: Upload Bandit Report as Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{matrix.service}}-${{matrix.python-version}}-bandit-report
+          path: ${{matrix.service}}-${{matrix.python-version}}-bandit-report.html
+    
+    deploy:
+      runs-on: ubuntu-latest
+      environment:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+      permissions:
+        pages: write
+        id-token: write
+      steps:
+        - uses: actions/download-artifact@v7
+          with:
+            name: tasks-api-3.12-bandit-report
+            path: _site
+        - uses: actions/upload-pages-artifact@v9
+          with:
+            path: _site
+            retention-days: 2 
+        - id: deployment
+          uses: actions/deploy-pages@v4
